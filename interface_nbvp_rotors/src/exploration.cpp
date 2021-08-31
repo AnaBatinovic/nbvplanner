@@ -69,7 +69,7 @@ int main(int argc, char** argv)
   }
   // Get parent frame id
   std::string parent_frame_id = " ";
-  nh.param<std::string>("exploration/parent_frame_id", parent_frame_id, "map"); 
+  nh.param<std::string>("exploration/parent_frame_id", parent_frame_id, "mavros/world"); 
 
   static int n_seq = 0;
 
