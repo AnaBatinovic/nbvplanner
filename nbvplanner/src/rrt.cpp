@@ -344,10 +344,10 @@ void nbvInspection::RrtTree::iterate(int iterations)
           params_.boundingBox_)
       && !multiagent::isInCollision(newParent->state_, newState, params_.boundingBox_, segments_)) {
     // Sample the new orientation
-    //newState[3] = 2.0 * M_PI * (((double) rand()) / ((double) RAND_MAX) - 0.5);
+    newState[3] = 2.0 * M_PI * (((double) rand()) / ((double) RAND_MAX) - 0.5);
 
     //MAV orientation towards next point .. atan2(dy,dx)
-    newState[3] = atan2(direction[1], direction[0]);
+    // newState[3] = atan2(direction[1], direction[0]);
 
     // Create new node and insert into tree
     nbvInspection::Node<StateVec> * newNode = new nbvInspection::Node<StateVec>;
@@ -355,16 +355,14 @@ void nbvInspection::RrtTree::iterate(int iterations)
     newNode->parent_ = newParent;
     newNode->distance_ = newParent->distance_ + direction.norm();
     newParent->children_.push_back(newNode);
-    /*
     newNode->gain_ = newParent->gain_
         + gain(newNode->state_) * exp(-params_.degressiveCoeff_ * newNode->distance_);
-    */
     if(!params_.updateDegressiveCoeff_){
       degressiveCoeff_ = params_.degressiveCoeff_;
     }
   
-    newNode->gain_ = newParent->gain_
-        + gain(newNode->state_) * exp(-degressiveCoeff_* newNode->distance_);
+    // newNode->gain_ = newParent->gain_
+    //     + gain(newNode->state_) * exp(-degressiveCoeff_* newNode->distance_);
 
     kd_insert3(kdTree_, newState.x(), newState.y(), newState.z(), newNode);
     // Display new node
