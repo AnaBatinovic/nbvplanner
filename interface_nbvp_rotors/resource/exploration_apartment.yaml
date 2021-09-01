@@ -7,8 +7,8 @@ system/laser/pitch: [10.0]
 system/laser/horizontal: [360.0]
 system/laser/vertical: [30.0]
 # bounding box for colliaion avoidance
-system/bbx/x: 1.0
-system/bbx/y: 1.0
+system/bbx/x: 0.8
+system/bbx/y: 0.8
 system/bbx/z: 0.5
 system/bbx/overshoot: 0.3
 

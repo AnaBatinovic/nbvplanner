@@ -25,8 +25,9 @@ windows:
   - exploration:
       layout: tiled
       panes:
-        - "#waitForRos; waitForOdometry; roslaunch interface_nbvp_rotors kopterworx_exploration.launch"
+        - "waitForRos; waitForOdometry; roslaunch interface_nbvp_rotors kopterworx_exploration.launch"
   - rviz:
       layout: tiled
       panes:
         - waitForRos; waitForOdometry; rosrun rviz rviz -d ~/nbvp_ws/src/nbvplanner/interface_nbvp_rotors/rviz/nbv.rviz
+        - waitForRos; waitForOdometry; rosparam set use_sim_time true; rosbag record -o original /red/octomap_volume /red/comp_times __name:=my_bag 

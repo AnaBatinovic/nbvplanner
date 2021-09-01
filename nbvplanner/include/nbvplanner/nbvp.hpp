@@ -261,7 +261,9 @@ bool nbvInspection::nbvPlanner<stateVec>::plannerCallback(nbvplanner::nbvp_srv::
         return true;
       } else {
           ROS_INFO("No gain found, shutting down");
+          system("rosnode kill /my_bag");
           ros::shutdown();
+          system("tmux kill-session -t single_kopter");
           return true;
         }
     }
