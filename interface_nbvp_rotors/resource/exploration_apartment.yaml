@@ -17,10 +17,10 @@ nbvp/gain/occupied: 0.0
 nbvp/gain/unmapped: 1.0
 nbvp/gain/area: 0.0
 nbvp/gain/probabilistic: 0.0
-nbvp/gain/range: 5.0
+nbvp/gain/range: 2.0
 nbvp/gain/zero: 0.0
-nbvp/gain/degressive_coeff: 0.3
-nbvp/tree/extension_range: 2.0
+nbvp/gain/degressive_coeff: 0.5
+nbvp/tree/extension_range: 1.0
 nbvp/tree/exact_root: true
 nbvp/tree/initial_iterations: 20
 nbvp/tree/cuttoff_iterations: 200
