@@ -7,8 +7,8 @@ system/laser/pitch: [10.0]
 system/laser/horizontal: [360.0]
 system/laser/vertical: [30.0]
 # bounding box for collision avoidance
-system/bbx/x: 0.8
-system/bbx/y: 0.8
+system/bbx/x: 1.0
+system/bbx/y: 1.0
 system/bbx/z: 0.5
 system/bbx/overshoot: 0.3
 
@@ -17,10 +17,10 @@ nbvp/gain/occupied: 0.0
 nbvp/gain/unmapped: 1.0
 nbvp/gain/area: 0.0
 nbvp/gain/probabilistic: 0.0
-nbvp/gain/range: 8.0
+nbvp/gain/range: 2.0
 nbvp/gain/zero: 0.0
-nbvp/gain/degressive_coeff: 0.3
-nbvp/tree/extension_range: 2.0
+nbvp/gain/degressive_coeff: 0.5
+nbvp/tree/extension_range: 1.5
 nbvp/tree/exact_root: true
 nbvp/tree/initial_iterations: 20
 nbvp/tree/cuttoff_iterations: 200

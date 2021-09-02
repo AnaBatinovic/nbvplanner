@@ -12,7 +12,7 @@ windows:
   - gazebo:
       layout: tiled
       panes:
-        - waitForRos; roslaunch ardupilot_gazebo kopterworx.launch use_sim_time:=true enable_velodyne:=true max_range:=20 world:=$(rospack find interface_nbvp_rotors)/worlds/apartment.world x:=0 y:=0
+        - waitForRos; roslaunch ardupilot_gazebo kopterworx.launch use_sim_time:=true enable_velodyne:=true max_range:=20 world:=$(rospack find interface_nbvp_rotors)/worlds/maze-raspall.world x:=0 y:=-4
   - arm&takeof:
       layout: tiled
       panes:
@@ -29,5 +29,4 @@ windows:
   - rviz:
       layout: tiled
       panes:
-        - waitForRos; waitForOdometry; rosrun rviz rviz -d ~/nbvp_ws/src/nbvplanner/interface_nbvp_rotors/rviz/nbv.rviz
-        - waitForRos; waitForOdometry; rosparam set use_sim_time true; rosbag record -o original /red/octomap_volume /red/comp_times __name:=my_bag 
+        - waitForRos; waitForOdometry; rosrun rviz rviz -d ~/nbvp_ws/src/nbvplanner/interface_nbvp_rotors/rviz/nbv.rviz 
