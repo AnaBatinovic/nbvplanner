@@ -1,0 +1,35 @@
+name: single_kopter
+root: ./
+startup_window: roscore
+pre_window: export UAV_NAMESPACE=red;
+windows:
+  - roscore:
+      layout: tiled
+      panes:
+        - roscore
+        - waitForRos; roslaunch erl_drone apm2.launch
+        - waitForRos; waitForMavros; rosrun erl_drone mavsys_script.sh
+        - waitForRos; roslaunch erl_drone velodyne.launch rpm:=1200
+        - waitForRos; roslaunch multirotor_transformations rc_to_joy.launch config_file:=custom_config/deadzone_frsky.yaml
+  - control:
+      layout: tiled
+      panes:
+        - waitForRos; waitForGlobal; roslaunch uav_ros_control pid_carrot.launch manual_takeoff:=true
+        - waitForRos; waitForGlobal; roslaunch uav_ros_tracker topp_tracker.launch tracker_config:=./custom_config/topp_config_custom.yaml
+  - exploration:
+      layout: tiled
+      panes:
+        - waitForRos; waitForGlobal; roslaunch interface_nbvp_rotors planner.launch
+        - waitForRos; waitForGlobal; roslaunch interface_nbvp_rotors execute_trajectory.launch
+        - "#waitForRos; waitForGlobal; roslaunch interface_nbvp_rotors kopterworx_exploration.launch"
+         - "#rosservice call /$UAV_NAMESPACE/confirm_trajectory \"data: true\""
+        - "#cd ~/Documents/bag; rosbag record /$UAV_NAMESPACE/octomap_volume /$UAV_NAMESPACE/comp_times -o volume"
+  - manual_control:
+      layout: tiled
+      panes:
+        - history -s "rosservice call /$UAV_NAMESPACE/position_hold"
+        - history -s "rostopic pub /UAV_NAMESPACE/nbvp/point_reached"
+  - rviz:
+      layout: tiled
+      panes:
+        - waitForRos; waitForOdometry; rosrun rviz rviz -d ~/nbvp_ws/src/nbvplanner/interface_nbvp_rotors/rviz/nbv.rviz
