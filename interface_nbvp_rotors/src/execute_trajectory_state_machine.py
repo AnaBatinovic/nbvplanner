@@ -27,6 +27,7 @@ class UavExplorationSm:
     self.start_time = time.time()
     self.execution_start = time.time()
     self.confirmed = False
+    self.service_called = False
     # Initialize ROS params
     # Distance of the UAV from the target pose at which we consider the 
     # trajectory to be executed
@@ -59,7 +60,7 @@ class UavExplorationSm:
     rospy.wait_for_service('multi_dof_trajectory', timeout=30)
     self.plan_trajectory_service = rospy.ServiceProxy(
       "multi_dof_trajectory", MultiDofTrajectory)
-    
+    rospy.Service('confirm_trajectory', SetBool, self.confirm_trajectory)
     
     # Initialize subscribers
     rospy.Subscriber('nbvp/goals', PoseArray, 
@@ -145,20 +146,31 @@ class UavExplorationSm:
 
         response = self.plan_trajectory_service.call(request)
 
-        # If we did not manage to obtain a successful plan then go to
-        # appropriate state.
-        if response.success == False:
-          print ("**********************************************")
-          print ("In state:", self.state)
-          print ("Path planning failed!")
-          print ("**********************************************")
-          print (" ")
-          self.state = ("end")
-        # If plan was successful then execute it.
+        while not self.service_called and not rospy.is_shutdown():
+          rospy.sleep(0.01)
+        self.service_called = False
+
+        # If trajectory is OK publish it
+        print ("Waiting for USER to CONFIRM trajectory!")
+        if self.confirmed:
+          # If we did not manage to obtain a successful plan then go to
+          # appropriate state.
+          # print ("Waiting for USER to CONFIRM trajectory!)"
+          if response.success == False:
+            print ("**********************************************")
+            print ("In state:", self.state)
+            print ("Path planning failed!")
+            print ("**********************************************")
+            print (" ")
+            self.state = ("end")
+          # If plan was successful then execute it.
+          else:
+            self.trajectory_pub.publish(response.trajectory)
+            print("Path planning done! Go to execute state!")
+            self.state = "execute"
+        # If trajectory is not ok
         else:
-          self.trajectory_pub.publish(response.trajectory)
-          print("Path planning done! Go to execute state!")
-          self.state = "execute"
+          self.state = "end"
     
       # While trajectory is executing we check if it is done 
       if self.state == "execute":
@@ -254,6 +266,15 @@ class UavExplorationSm:
       return True
     else:
       return False
+    
+  def confirm_trajectory(self, req):
+    self.service_called = True
+    self.confirmed = req.data
+    if (req.data):
+      print("Trajectory OK!")
+    else:
+      print("Trajectory is NOT OK!") 
+    return SetBoolResponse(True, "Service confirm_trajectory called")
 
 if __name__ == '__main__':
 

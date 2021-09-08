@@ -35,7 +35,7 @@
 #include <nbvplanner/nbvp_srv.h>
 #include <nbvplanner/volume_srv.h>
 
-bool current_goal_reached = true;
+bool current_goal_reached = false;
 
 void pointReachedCallback(std_msgs::Bool msg)
 {
@@ -50,32 +50,11 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "exploration");
   ros::NodeHandle nh;
-  ros::Publisher trajectory_pub = nh.advertise < trajectory_msgs::MultiDOFJointTrajectoryPoint
-      > (mav_msgs::default_topics::COMMAND_TRAJECTORY, 5);
   ros::Publisher goals_pub = nh.advertise < geometry_msgs::PoseArray > ("nbvp/goals", 1);
   ros::Subscriber point_reached_sub = nh.subscribe("nbvp/point_reached", 1, &pointReachedCallback);
   ROS_INFO("Started exploration");
 
-  std_srvs::Empty srv;
-  bool unpaused = ros::service::call("/gazebo/unpause_physics", srv);
-  unsigned int i = 0;
-
-  // Trying to unpause Gazebo for 10 seconds.
-  while (i <= 10 && !unpaused) {
-    ROS_INFO("Wait for 1 second before trying to unpause Gazebo again.");
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    unpaused = ros::service::call("/gazebo/unpause_physics", srv);
-    ++i;
-  }
-
-  if (!unpaused) {
-    ROS_FATAL("Could not wake up Gazebo.");
-    return -1;
-  } else {
-    ROS_INFO("Unpaused the Gazebo simulation.");
-  }
-
-  double dt = 1.0;
+   double dt = 1.0;
   std::string ns = ros::this_node::getName();
   if (!ros::param::get(ns + "/nbvp/dt", dt)) {
     ROS_FATAL("Could not start exploration. Parameter missing! Looking for %s",
@@ -92,36 +71,6 @@ int main(int argc, char** argv)
   mav_msgs::EigenTrajectoryPoint trajectory_point;
   trajectory_msgs::MultiDOFJointTrajectoryPoint trajectory_point_msg;
 
-  // This is the initialization motion, necessary that the known free space allows the planning
-  // of initial paths.
-  ROS_INFO("Starting the planner: Performing initialization motion");
-  for (double i = 0; i <= 0.5; i = i + 0.1) {
-    nh.param<double>("exploration/wp_x", trajectory_point.position_W.x(), 0.0);
-    nh.param<double>("exploration/wp_y", trajectory_point.position_W.y(), 0.0);
-    nh.param<double>("exploration/wp_z", trajectory_point.position_W.z(), 1.0);
-    samples_array.header.seq = n_seq;
-    samples_array.header.stamp = ros::Time::now();
-    samples_array.points.clear();
-    n_seq++;
-    tf::Quaternion quat = tf::Quaternion(tf::Vector3(0.0, 0.0, 1.0), M_PI * i);
-    trajectory_point.setFromYaw(tf::getYaw(quat));
-    mav_msgs::msgMultiDofJointTrajectoryPointFromEigen(trajectory_point, &trajectory_point_msg);
-    samples_array.points.push_back(trajectory_point_msg);
-    trajectory_pub.publish(trajectory_point_msg);
-    ros::Duration(1.0).sleep();
-  }
-  trajectory_point.position_W.x() -= 2.0;
-  trajectory_point.position_W.y() += 0.5;
-  // trajectory_point.position_W.z() -= 0.25;
-  samples_array.header.seq = n_seq;
-  samples_array.header.stamp = ros::Time::now();
-  samples_array.points.clear();
-  n_seq++;
-  mav_msgs::msgMultiDofJointTrajectoryPointFromEigen(trajectory_point, &trajectory_point_msg);
-  samples_array.points.push_back(trajectory_point_msg);
-  trajectory_pub.publish(trajectory_point_msg);
-  ros::Duration(1.0).sleep();
-  
   // Start planning: The planner is called and the computed path sent to the controller.
   int iteration = 0;
   ros::Rate rate(1);
@@ -169,7 +118,7 @@ int main(int argc, char** argv)
     volumeSrv.request.header.seq = iteration;
     volumeSrv.request.header.frame_id = parent_frame_id;
     if(ros::service::call("volume_service", volumeSrv)){
-      ROS_INFO("Volume updated.");
+      // ROS_INFO("Volume updated.");
     }
     iteration++;
     rate.sleep();

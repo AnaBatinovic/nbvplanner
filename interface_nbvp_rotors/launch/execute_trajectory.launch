@@ -8,5 +8,10 @@
       <param name="radius_trajectory_executed" value="0.7"/>
       <param name="feedback_collection_time" value="1.0"/>
       <param name="rate" value="$(arg rate)"/>
+    
+    <node name="displayJointTrajectoryInRviz" pkg="interface_nbvp_rotors" 
+      type="displayJointTrajectoryInRviz.py" output="screen" />
+      <!-- <remap from="command/trajectory"  to="$(arg trajectory)"/> -->
+ 
   </group>
 </launch>

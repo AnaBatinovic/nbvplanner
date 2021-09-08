@@ -12,7 +12,7 @@
   <arg name="mesh_resolution"       default="1.0"/>
   <arg name="map_publish_frequency" default="1.0"/>
   <arg name="pcl_topic"             default="velodyne_points"/>
-  <arg name="param_file"            default="$(find interface_nbvp_rotors)/resource/exploration_large_maze.yaml"/>
+  <arg name="param_file"            default="$(find interface_nbvp_rotors)/resource/exploration_gaj.yaml"/>
   <arg name="waypoint_x"            default="0"/>
   <arg name="waypoint_y"            default="0"/>
   <arg name="waypoint_z"            default="1"/>
@@ -49,10 +49,5 @@
       <remap from="command/trajectory"  to="$(arg trajectory)"/>
       <rosparam command="load"          file="$(arg param_file)"/>
     </node>
-
-    <node name="displayMultiDofTrajectoryInRviz" pkg="interface_nbvp_rotors" 
-      type="displayMultiDOFTrajectoryInRviz.py" output="screen" />
-      <remap from="command/trajectory"  to="$(arg trajectory)"/>
-  </group>
-
+ </group>
 </launch>

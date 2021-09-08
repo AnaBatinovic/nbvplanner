@@ -367,9 +367,9 @@ void nbvInspection::RrtTree::iterate(int iterations)
     newNode->gain_ = newParent->gain_
         + samplePathWithCubes(newNode->state_, newParent->state_, params_.navigationFrame_) 
         * exp(-params_.degressiveCoeff_ * newNode->distance_);
-    if (newNode->gain_ != 0){
-      std::cout << "Node gain, distance : " << newNode->gain_ << ", " << newNode->distance_ << std::endl;
-    }
+    // if (newNode->gain_ != 0){
+    //   std::cout << "Node gain, distance : " << newNode->gain_ << ", " << newNode->distance_ << std::endl;
+    // }
     kd_insert3(kdTree_, newState.x(), newState.y(), newState.z(), newNode);
     // Display new node
     publishNode(newNode);
@@ -761,7 +761,7 @@ void nbvInspection::RrtTree::visualizeGainRed(Eigen::Vector3d vec)
   p.color.r = 1.0;
   p.color.g = 0.0;
   p.color.b = 0.0;
-  p.color.a = 0.6;
+  p.color.a = 0.5;
   p.lifetime = ros::Duration(10.0);
   p.frame_locked = false;
   params_.inspectionPath_.publish(p);
@@ -1077,10 +1077,10 @@ double nbvInspection::RrtTree::gainCuboid(StateVec state, double distance, doubl
   // double volume = unknownNum * pow(resolution, 3.0); 
   // gain = volume;
   gain = 1000 * ((double)unknownNum / (double)allNum);
-  if (unknownNum != 0)
-  {
-    std::cout << "Unknown, gain: " << unknownNum << ", " << gain << std::endl;
-  }
+  // if (unknownNum != 0)
+  // {
+  //   std::cout << "Unknown, gain: " << unknownNum << ", " << gain << std::endl;
+  // }
   return gain;
 }
 
@@ -1226,7 +1226,7 @@ void nbvInspection::RrtTree::publishNode(Node<StateVec> * node)
   p.pose.orientation.y = quat.y();
   p.pose.orientation.z = quat.z();
   p.pose.orientation.w = quat.w();
-  p.scale.x = std::max(node->gain_ / 20.0, 0.05);
+  p.scale.x = 0.1;
   p.scale.y = 0.1;
   p.scale.z = 0.1;
   p.color.r = 167.0 / 255.0;
