@@ -2,8 +2,8 @@
 
 <launch>
   <arg name="mav_name"              default="red"/>
-  <arg name="parent_frame"          default="mavros/world"/>
-  <arg name="child_frame"           default="base_link"/>
+  <arg name="parent_frame"          default="map"/>
+  <arg name="child_frame"           default="red/base_link"/>
   <arg name="resolution"            default="0.15"/>
   <arg name="visualize_max_z"       default="2.5"/>
   <arg name="sensor_max_range"      default="20.0"/>
@@ -21,10 +21,11 @@
   <group ns="$(arg mav_name)">   
     <!--tf from mavros/world to red/base_link -->
     <node name="tf_node" pkg="interface_nbvp_rotors" type="tf_node" output="screen">
-      <param name="child_frame_id"  value="$(arg mav_name)/$(arg child_frame)"/>
+      <param name="child_frame_id"  value="$(arg child_frame)"/>
       <param name="parent_frame_id" value="$(arg parent_frame)"/>
       <remap from="odometry"        to="$(arg odometry)"/>
     </node>
+     <node name="map_transform" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 map mavros/world 100" />
    
     <node name="nbvPlanner" pkg="nbvplanner"  type="nbvPlanner" output="screen">
       <param name="tf_frame"                  type="string" value="$(arg parent_frame)"/>
