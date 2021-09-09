@@ -22,14 +22,15 @@ windows:
         - waitForRos; waitForGlobal; roslaunch interface_nbvp_rotors planner.launch
         - waitForRos; waitForGlobal; roslaunch interface_nbvp_rotors execute_trajectory.launch
         - "#waitForRos; waitForGlobal; roslaunch interface_nbvp_rotors kopterworx_exploration.launch"
-         - "#rosservice call /$UAV_NAMESPACE/confirm_trajectory \"data: true\""
-        - "#cd ~/Documents/bag; rosbag record /$UAV_NAMESPACE/octomap_volume /$UAV_NAMESPACE/comp_times -o volume"
+         - "#rosservice call /red/confirm_trajectory \"data: true\""
+        - "#rosbag record /red/octomap_volume /red/comp_times -o volume"
   - manual_control:
       layout: tiled
       panes:
-        - history -s "rosservice call /$UAV_NAMESPACE/position_hold"
-        - history -s "rostopic pub /UAV_NAMESPACE/nbvp/point_reached"
-  - rviz:
+        - history -s "rosservice call /red/position_hold"
+        - history -s "rostopic pub /red/nbvp/point_reached"
+  - tf:
       layout: tiled
       panes:
-        - waitForRos; waitForOdometry; rosrun rviz rviz -d ~/nbvp_ws/src/nbvplanner/interface_nbvp_rotors/rviz/nbv.rviz
+        - waitForRos; waitForGlobal; roslaunch interface_nbvp_rotors tf_from_mavros.launch
+        - waitForRos; waitForGlobal; roslaunch erl_drone robot_state_publisher.launch

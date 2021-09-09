@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="mav_name"              default="red"/>
+  <arg name="parent_frame"          default="map"/>
+  <arg name="child_frame"           default="red/base_link"/>
+  <arg name="odometry"              default="mavros/global_position/local"/>
+ 
+  <group ns="$(arg mav_name)">   
+    <!--tf from mavros/world to red/base_link -->
+    <node name="tf_node" pkg="interface_nbvp_rotors" type="tf_node" output="screen">
+      <param name="child_frame_id"  value="$(arg child_frame)"/>
+      <param name="parent_frame_id" value="$(arg parent_frame)"/>
+      <remap from="odometry"        to="$(arg odometry)"/>
+    </node>
+     <!-- <node name="map_transform" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 map mavros/world 100" /> -->
+   
+ </group>
+</launch>
