@@ -53,6 +53,7 @@ nbvInspection::nbvPlanner<stateVec>::nbvPlanner(const ros::NodeHandle& nh,
   plannerService_ = nh_.advertiseService("nbvplanner",
                                          &nbvInspection::nbvPlanner<stateVec>::plannerCallback,
                                          this);
+  testService_ = nh_.advertiseService("test", &nbvInspection::nbvPlanner<stateVec>::testCallback, this);
   posClient_ = nh_.subscribe("pose", 10, &nbvInspection::nbvPlanner<stateVec>::posCallback, this);
   odomClient_ = nh_.subscribe("odometry", 10, &nbvInspection::nbvPlanner<stateVec>::odomCallback, this);
 
@@ -251,6 +252,50 @@ bool nbvInspection::nbvPlanner<stateVec>::plannerCallback(nbvplanner::nbvp_srv::
   allTimes.data[1] = computationTime2;
   allTimes.data[2] = computationTime;
   compTimesPub_.publish(allTimes);
+  return true;
+}
+
+template<typename stateVec>
+bool nbvInspection::nbvPlanner<stateVec>::testCallback(std_srvs::EmptyRequest& req,
+                                                          std_srvs::EmptyResponse& res)
+{
+  ros::Time computationStartTime = ros::Time::now();
+  // Check that planner is ready to compute path.
+  if (!ros::ok()) {
+    ROS_INFO_THROTTLE(1, "Exploration finished. Not planning any further moves.");
+    return true;
+  }
+  if (!ready_) {
+    ROS_ERROR_THROTTLE(1, "Planner not set up: Planner not ready!");
+    return true;
+  }
+  if (manager_ == NULL) {
+    ROS_ERROR_THROTTLE(1, "Planner not set up: No octomap available!");
+    return true;
+  }
+  if (manager_->getMapSize().norm() <= 0.0) {
+    ROS_ERROR_THROTTLE(1, "Planner not set up: Octomap is empty!");
+    return true;
+  }
+
+  // Clear old tree and reinitialize.
+  tree_->clear();
+  tree_->initialize();
+
+  nbvInspection::RrtTree * rrtTree = new nbvInspection::RrtTree(manager_); 
+  nbvInspection::RrtTree::StateVec startState;
+  nbvInspection::RrtTree::StateVec endState;
+
+  startState[0] = -1;
+  startState[1] = 0;
+  startState[2] = 0.7;
+
+  endState[0] = -2;
+  endState[1] = 0;
+  endState[2] = 0.7;
+  rrtTree->setParams(params_);
+  double information_gain = rrtTree->samplePathWithCubes(startState, endState, "mavros/world");
+  std::cout << "Information gain: " << information_gain << std::endl;
   return true;
 }
 

@@ -37,14 +37,16 @@
       <rosparam command="load"                file="$(arg param_file)" />
     </node>
 
-    <node name="exploration" pkg="interface_nbvp_rotors" type="exploration" output="screen">
+    <!-- <node name="exploration" pkg="interface_nbvp_rotors" type="exploration" output="screen">
       <param name="parent_frame_id"     type="string" value="$(arg parent_frame)"/>
       <param name="wp_x"                type="double" value="$(arg waypoint_x)" />
       <param name="wp_y"                type="double" value="$(arg waypoint_y)" />
       <param name="wp_z"                type="double" value="$(arg waypoint_z)" />
       <remap from="command/trajectory"  to="$(arg trajectory)"/>
       <rosparam command="load"          file="$(arg param_file)"/>
-    </node>
+    </node> -->
+
+    <node name="test_rsc" pkg="interface_nbvp_rotors" type="test_rsc" output="screen"/>
   </group>
 
 </launch>

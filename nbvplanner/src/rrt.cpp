@@ -619,9 +619,9 @@ void nbvInspection::RrtTree::visualizeCenter(Eigen::Vector3d vec)
   p.pose.orientation.y = quat.y();
   p.pose.orientation.z = quat.z();
   p.pose.orientation.w = quat.w();
-  p.scale.x = 0.15;
-  p.scale.y = 0.15;
-  p.scale.z = 0.15;
+  p.scale.x = 0.5;
+  p.scale.y = 0.5;
+  p.scale.z = 0.5;
   p.color.r = 0.0;
   p.color.g = 0.0;
   p.color.b = 1.0;
@@ -848,14 +848,19 @@ int nbvInspection::RrtTree::castUnknown(StateVec state, double a, double distanc
   if (start_slope < end_slope) {
     return 0;
   }
-
+  double radius = a;
   double next_start_slope = start_slope;
-  for (double z = -a / 2; z <= a / 2 / resolution; z += resolution){
-    for (double i = row; i <= a / 2 / resolution; i += 1) {
+  for (double z = -a / 2; z <= a / 2; z += resolution){
+    for (double j = row; j <= radius +1; j += 1) {
       bool blocked = false;
-      for (double dx = -i, dy = -i; dx <= 0; dx += 1) {
+      for (double dx = -j - 1, dy = -j; dx <= 0; dx += 1) {
+        // Translate dx , dy coordinates into map coordinates
+        double X = state[0] + dx * xx + dy * xy;
+        double Y = state[1] + dx * yx + dy * yy;
         // Slide l_slope and r_slope in one row, left goes through the first point
         // the right one 45 degrees down
+        // l_slope and r_slope store the slopes of the left and right
+        // extremities of the square we're considering:
         double l_slope = (dx - 0.5) / (dy + 0.5);
         double r_slope = (dx + 0.5) / (dy - 0.5);
         if (start_slope < r_slope) {
@@ -863,51 +868,63 @@ int nbvInspection::RrtTree::castUnknown(StateVec state, double a, double distanc
         } else if (end_slope > l_slope) {
             break;
         }
-        double sax = dx * xx + dy * xy;
-        double say = dx * yx + dy * yy;
-        // if (sax < 0 || say < 0)
-        // {
-        //   continue;
-        // }
-        // Global position
-        double ax = state[0] + sax;
-        double ay = state[1] + say;
-        // Check if the calculated point is out of the map bounding box given in yaml
-        if (ax >= params_.maxX_ || ax < params_.minX_ ||
-          ay >= params_.maxY_ || ay < params_.minY_ ||
-          z >= params_.maxZ_ || z < params_.minZ_) {
-          continue;
-        }
-
-        Eigen::Vector3d vec(ax, ay, z);
-        double probability;
-        volumetric_mapping::OctomapManager::CellStatus node = manager_->getCellProbabilityPoint(
-          vec, &probability);
-        // If the point is inside the cuboid
-        if (std::abs(sax) < a / 2  && std::abs(say) < a / 2) {
-          // Mark the unknown cell
-          if (node == volumetric_mapping::OctomapManager::CellStatus::kUnknown) {
-          unknownNum++;
-            //Gain visualization
-            if(params_.gainVisualization_){
-              visualizeGainRed(vec);
-            }
-          }
-        }
-        if (blocked) {
-          if (node == volumetric_mapping::OctomapManager::CellStatus::kOccupied) {
-            next_start_slope = r_slope;
+        else {
+          // Else our beam is touching this square, consider it
+          
+          // Translate the dx, dy coordinates into map coordinates
+          // double sax = dx * xx + dy * xy;
+          // double say = dx * yx + dy * yy;
+          // if (sax < 0 || say < 0)
+          // {
+          //   continue;
+          // }
+          // Global position
+          // double ax = state[0] + sax;
+          // double ay = state[1] + say;
+          // Check if the calculated point is out of the map bounding box given in yaml
+          if (X >= params_.maxX_ || X < params_.minX_ ||
+            Y >= params_.maxY_ || Y < params_.minY_ ||
+            z >= params_.maxZ_ || z < params_.minZ_) {
             continue;
-          } else {
-            blocked = false;
-            start_slope = next_start_slope;
-            }
-        } else if (node == volumetric_mapping::OctomapManager::CellStatus::kOccupied) {
-            blocked = true;
-            next_start_slope = r_slope;
-            castUnknown(state, a, distance, i + 1, start_slope, l_slope, xx, xy, yx, yy);
           }
+          
+          // Get cell probability (status)
+          Eigen::Vector3d vec(X, Y, z);
+          double probability;
+          volumetric_mapping::OctomapManager::CellStatus node = manager_->getCellProbabilityPoint(
+            vec, &probability);
+
+          if (dx * dx + dy * dy < pow(radius, 2)) {
+            // Consider it, but check if it is unknown
+            // If the point is inside the cuboid
+            // if (std::abs(sax) < a / 2  && std::abs(say) < a / 2) {
+              // Mark the unknown cell
+              if (node == volumetric_mapping::OctomapManager::CellStatus::kUnknown) {
+              unknownNum++;
+                //Gain visualization
+                if(params_.gainVisualization_){
+                  visualizeGainRed(vec);
+                }
+              }
+            // }
+          }
+          if (blocked) {
+            if (node == volumetric_mapping::OctomapManager::CellStatus::kOccupied) {
+              next_start_slope = r_slope;
+              continue;
+            } else {
+              blocked = false;
+              start_slope = next_start_slope;
+              }
+          } else if (node == volumetric_mapping::OctomapManager::CellStatus::kOccupied && j < radius) {
+              // This is a blocking square, start a child scan
+              blocked = true;
+              castUnknown(state, a, distance, j + 1, start_slope, l_slope, xx, xy, yx, yy);
+              next_start_slope = r_slope;
+            }
+        }
       }
+      // Row is scanned; do next row unless last square was blocked
       if (blocked) {
           break;
       }
@@ -1201,7 +1218,7 @@ double nbvInspection::RrtTree::samplePathWithCubes(StateVec start, StateVec end,
   state[2] = origin[2];
   gain += gainCuboid(state, params_.gainRange_, params_.gainRange_);
   // Visualize cuboid on the path segment
-  // visualizeCuboid(start, end);
+  visualizeCuboid(start, end);
   return gain;
 }
 
