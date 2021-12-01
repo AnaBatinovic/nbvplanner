@@ -200,29 +200,16 @@ void nbvInspection::RrtTree::iterate(int iterations)
       == manager_->getLineStatusBoundingBox(
           origin, direction + origin + direction.normalized() * params_.dOvershoot_,
           params_.boundingBox_)) {
-    // Sample the new orientation
-    //newState[3] = 2.0 * M_PI * (((double) rand()) / ((double) RAND_MAX) - 0.5);
-
-    //MAV orientation towards next point .. atan2(dy,dx)
-    // newState[3] = atan2(direction[1], direction[0]);
-
     // Create new node and insert into tree
     nbvInspection::Node<StateVec> * newNode = new nbvInspection::Node<StateVec>;
     newNode->state_ = newState;
     newNode->parent_ = newParent;
     newNode->distance_ = newParent->distance_ + direction.norm();
     newParent->children_.push_back(newNode);
-    /*
-    newNode->gain_ = newParent->gain_
-        + gain(newNode->state_) * exp(-params_.degressiveCoeff_ * newNode->distance_);
-    */
     // Total gain is sum of all cubes along the rrt tree
     newNode->gain_ = newParent->gain_
         + samplePathWithCubes(newNode->state_, newParent->state_, params_.navigationFrame_) 
         * exp(-params_.degressiveCoeff_ * newNode->distance_);
-    if (newNode->gain_ != 0){
-      std::cout << "Node gain, distance : " << newNode->gain_ << ", " << newNode->distance_ << std::endl;
-    }
     kd_insert3(kdTree_, newState.x(), newState.y(), newState.z(), newNode);
     // Display new node
     publishNode(newNode);
@@ -304,10 +291,6 @@ void nbvInspection::RrtTree::initialize()
       newNode->parent_ = newParent;
       newNode->distance_ = newParent->distance_ + direction.norm();
       newParent->children_.push_back(newNode);
-      /*
-      newNode->gain_ = newParent->gain_
-          + gain(newNode->state_) * exp(-params_.degressiveCoeff_ * newNode->distance_);
-          */
 
       newNode->gain_ = newParent->gain_
         + samplePathWithCubes(newNode->state_, newParent->state_, params_.navigationFrame_)
@@ -393,7 +376,6 @@ std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::getBestPathNodes(std::s
   ret.push_back(node_pose);
   // Exact root is the best node
   exact_root_ = current->state_;
-  ROS_INFO("Tu sam");   
   if (current->parent_ != NULL) {
     while (current->parent_ != rootNode_ && current->parent_ != NULL) {
       node_pose.position.x = current->parent_->state_[0];
@@ -781,14 +763,11 @@ double nbvInspection::RrtTree::gain(StateVec state)
   return gain;
 }
 
-double nbvInspection::RrtTree::gainCuboid(StateVec state, double distance, double a)
+double nbvInspection::RrtTree::gainCuboid(StateVec state, double distance, double gain_range)
 {
   // Computes the number of unknown cells inside the cuboid with the origin in the state
-  double gain = 0.0;
   const double resolution = manager_->getResolution();
   int unknownNum = 0;
-  // All points in 3D space
-  double allNum = (distance / resolution) * (a / resolution) * (a / resolution);
 
   static double multipliers[4][8] = {
     {1, 0, 0, -1, -1, 0, 0, 1},
@@ -797,24 +776,18 @@ double nbvInspection::RrtTree::gainCuboid(StateVec state, double distance, doubl
     {1, 0, 0, 1, -1, 0, 0, -1}
   };
 
-  // Go through all octants; find the sum of unknown cells
+  // Go through all octants; do shadowcasting; find the number of unknown cells 
   for (uint i = 0; i < 8; i++)
   {
-    unknownNum += castUnknown(state, a, distance, 1.0, 1.0, 0.0, multipliers[0][i],
+    unknownNum += castUnknown(state, gain_range, distance, resolution, 1.0, 0.0, multipliers[0][i],
                 multipliers[1][i], multipliers[2][i], multipliers[3][i]);
   }
 
-  double volume = unknownNum * pow(resolution, 3.0); 
-  gain = volume;
-  // gain = 1000 * ((double)unknownNum / (double)allNum);
-  // if (unknownNum != 0)
-  // {
-  //   std::cout << "Unknown, gain: " << unknownNum << ", " << gain << std::endl;
-  // }
-  return gain;
+  // return unknown volume
+  return unknownNum * pow(resolution, 3.0); 
 }
 
-int nbvInspection::RrtTree::castUnknown(StateVec state, double a, double distance, double row, 
+int nbvInspection::RrtTree::castUnknown(StateVec state, double gain_range, double distance, double row, 
   double start_slope, double end_slope, double xx, double xy, double yx, double yy)
 {
   // Returns number of unknown in one octant
@@ -823,12 +796,12 @@ int nbvInspection::RrtTree::castUnknown(StateVec state, double a, double distanc
   if (start_slope < end_slope) {
     return 0;
   }
-  double radius = a;
   double next_start_slope = start_slope;
-  for (double z = -a / 2; z <= a / 2; z += resolution){
-    for (double j = row; j <= radius +1; j += 1) {
+ 
+  for (double z = - gain_range / 2; z <= gain_range / 2; z += resolution){
+    for (double j = row; j <= gain_range; j += resolution) {
       bool blocked = false;
-      for (double dx = -j - 1, dy = -j; dx <= 0; dx += 1) {
+      for (double dx = -j - resolution, dy = -j; dx <= 0; dx += resolution) {
         // Translate dx , dy coordinates into map coordinates
         double X = state[0] + dx * xx + dy * xy;
         double Y = state[1] + dx * yx + dy * yy;
@@ -845,17 +818,6 @@ int nbvInspection::RrtTree::castUnknown(StateVec state, double a, double distanc
         }
         else {
           // Else our beam is touching this square, consider it
-          
-          // Translate the dx, dy coordinates into map coordinates
-          // double sax = dx * xx + dy * xy;
-          // double say = dx * yx + dy * yy;
-          // if (sax < 0 || say < 0)
-          // {
-          //   continue;
-          // }
-          // Global position
-          // double ax = state[0] + sax;
-          // double ay = state[1] + say;
           // Check if the calculated point is out of the map bounding box given in yaml
           if (X >= params_.maxX_ || X < params_.minX_ ||
             Y >= params_.maxY_ || Y < params_.minY_ ||
@@ -868,20 +830,18 @@ int nbvInspection::RrtTree::castUnknown(StateVec state, double a, double distanc
           double probability;
           volumetric_mapping::OctomapManager::CellStatus node = manager_->getCellProbabilityPoint(
             vec, &probability);
+          // Check if the point is inside the circle with radius 
 
-          if (dx * dx + dy * dy < pow(radius, 2)) {
+          // Check if the point is inside the square
+          if (std::abs(dx) < gain_range / 2  && std::abs(dy) < gain_range / 2) {
             // Consider it, but check if it is unknown
             // If the point is inside the cuboid
-            // if (std::abs(sax) < a / 2  && std::abs(say) < a / 2) {
-              // Mark the unknown cell
-              if (node == volumetric_mapping::OctomapManager::CellStatus::kUnknown) {
+            // Mark the unknown cell
+            if (node == volumetric_mapping::OctomapManager::CellStatus::kUnknown) {
               unknownNum++;
-                //Gain visualization
-                if(params_.gainVisualization_){
-                  visualizeGainRed(vec);
-                }
-              }
-            // }
+              // Gain visualization
+              if(params_.gainVisualization_) visualizeGainRed(vec);
+            }
           }
           if (blocked) {
             if (node == volumetric_mapping::OctomapManager::CellStatus::kOccupied) {
@@ -891,10 +851,10 @@ int nbvInspection::RrtTree::castUnknown(StateVec state, double a, double distanc
               blocked = false;
               start_slope = next_start_slope;
               }
-          } else if (node == volumetric_mapping::OctomapManager::CellStatus::kOccupied && j < radius) {
+          } else if (node == volumetric_mapping::OctomapManager::CellStatus::kOccupied && j < gain_range) {
               // This is a blocking square, start a child scan
               blocked = true;
-              castUnknown(state, a, distance, j + 1, start_slope, l_slope, xx, xy, yx, yy);
+              castUnknown(state, gain_range, distance, j + 1, start_slope, l_slope, xx, xy, yx, yy);
               next_start_slope = r_slope;
             }
         }
@@ -973,7 +933,8 @@ void nbvInspection::RrtTree::publishNode(Node<StateVec> * node)
   p.pose.orientation.y = quat.y();
   p.pose.orientation.z = quat.z();
   p.pose.orientation.w = quat.w();
-  p.scale.x = std::max(node->gain_ / 20.0, 0.05);
+  // p.scale.x = std::max(node->gain_ / 20.0, 0.05);
+  p.scale.x = 0.1;
   p.scale.y = 0.1;
   p.scale.z = 0.1;
   p.color.r = 167.0 / 255.0;
@@ -1038,7 +999,8 @@ void nbvInspection::RrtTree::publishBestNode()
   p.pose.orientation.y = quat.y();
   p.pose.orientation.z = quat.z();
   p.pose.orientation.w = quat.w();
-  p.scale.x = std::max(bestNode_->gain_ / 10.0, 0.5);
+  // p.scale.x = std::max(bestNode_->gain_ / 10.0, 0.5);
+   p.scale.x = 0.5;
   p.scale.y = 0.5;
   p.scale.z = 0.5;
   p.color.r = 1.0;
@@ -1070,7 +1032,8 @@ void nbvInspection::RrtTree::publishCurrentNode(Node<StateVec> * node)
   p.pose.orientation.y = quat.y();
   p.pose.orientation.z = quat.z();
   p.pose.orientation.w = quat.w();
-  p.scale.x = std::max(node->gain_ / 10.0, 0.5);
+  // p.scale.x = std::max(node->gain_ / 10.0, 0.5);
+  p.scale.x = 0.5;
   p.scale.y = 0.5;
   p.scale.z = 0.5;
   p.color.r = 0.0;
@@ -1180,18 +1143,20 @@ double nbvInspection::RrtTree::samplePathWithCubes(StateVec start, StateVec end,
   double delta_x = end[0] - start[0];
   double delta_y = end[1] - start[1];
   double alpha = atan2(delta_y, delta_x);
-
-  tf::Vector3 origin(start[0] + distance[0]/2 * cos(alpha), 
-                    start[1] + distance[0]/2 * sin(alpha),
+  
+  // Origin is the center between start and end point
+  tf::Vector3 origin(start[0] + distance.norm() / 2 * cos(alpha), 
+                    start[1] + distance.norm() / 2 * sin(alpha),
                     start[2]);
+
   Eigen::Vector3d center(origin[0], origin[1], origin[2]);
-  visualizeCenter(center);
+  // visualizeCenter(center);
   origin = transform * origin;
   StateVec state;
   state[0] = origin[0];
   state[1] = origin[1];
   state[2] = origin[2];
-  gain += gainCuboid(state, params_.gainRange_, params_.gainRange_);
+  gain += gainCuboid(state, distance.norm(), params_.gainRange_);
   // Visualize cuboid on the path segment
   visualizeCuboid(start, end);
   return gain;
