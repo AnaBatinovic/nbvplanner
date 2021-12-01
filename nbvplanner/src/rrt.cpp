@@ -216,10 +216,6 @@ void nbvInspection::RrtTree::iterate(int iterations)
     newNode->gain_ = newParent->gain_
         + gain(newNode->state_) * exp(-params_.degressiveCoeff_ * newNode->distance_);
     */
-    if(!params_.updateDegressiveCoeff_){
-      degressiveCoeff_ = params_.degressiveCoeff_;
-    }
-
     // Total gain is sum of all cubes along the rrt tree
     newNode->gain_ = newParent->gain_
         + samplePathWithCubes(newNode->state_, newParent->state_, params_.navigationFrame_) 
@@ -312,9 +308,7 @@ void nbvInspection::RrtTree::initialize()
       newNode->gain_ = newParent->gain_
           + gain(newNode->state_) * exp(-params_.degressiveCoeff_ * newNode->distance_);
           */
-      if(!params_.updateDegressiveCoeff_){
-        degressiveCoeff_ = params_.degressiveCoeff_;
-      }
+
       newNode->gain_ = newParent->gain_
         + samplePathWithCubes(newNode->state_, newParent->state_, params_.navigationFrame_)
         * exp(-params_.degressiveCoeff_ * newNode->distance_);
@@ -514,25 +508,6 @@ bool nbvInspection::RrtTree::setGoal(){
 
 int nbvInspection::RrtTree::getHistorySize(){
   return history_.size();
-}
-
-void nbvInspection::RrtTree::updateDegressiveCoeff(){
-  double *dV;
-  //Calculate volume derivation
-  //dV[0] = dVfree ; dV[1] = dVoccupied
-  dV = manager_->getDerivation();
-  double totalVolume = (params_.maxX_ - params_.minX_) * 
-                       (params_.maxY_ - params_.minY_) * 
-                       (1.0 + params_.maxZ_ - params_.minZ_); 
-
-/*
-
-... TO DO ...
-
-*/
-
-  degressiveCoeff_ = params_.degressiveCoeff_;
-  ROS_INFO("[STATUS]Degressive Coeff.: %f", degressiveCoeff_);
 }
 
 void nbvInspection::RrtTree::visualizeGain(Eigen::Vector3d vec)

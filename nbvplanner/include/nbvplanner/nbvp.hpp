@@ -137,13 +137,6 @@ bool nbvInspection::nbvPlanner<stateVec>::volumeCallback(nbvplanner::volume_srv:
   allVolumes.data[3] = unmappedVolume;
   allVolumes.data[4] = timeNow;
   volumesPub_.publish(allVolumes);
-
-  if(params_.updateDegressiveCoeff_){
-    manager_->calculateDerivation(volumes, timeNow);
-    tree_->updateCoeff();
-  }
-
-
   return true;
 }
 
@@ -480,10 +473,6 @@ bool nbvInspection::nbvPlanner<stateVec>::setParams()
   params_.gainVisualization_ = false;
   if (!ros::param::get(ns + "/nbvp/gain/visualization", params_.gainVisualization_)) {
     ROS_WARN("Gain visualization is off by default. Turn on with %s: true", (ns + "/nbvp/gain/visualization").c_str());
-  }
-    params_.updateDegressiveCoeff_ = false;
-  if (!ros::param::get(ns + "/nbvp/gain/update_deg_coeff", params_.updateDegressiveCoeff_)) {
-    ROS_WARN("Degressive coeff update is off by default. Turn on with %s: true", (ns + "/nbvp/gain/update_deg_coeff").c_str());
   }
     params_.returnToOrigin_ = false;
   if (!ros::param::get(ns + "/nbvp/tree/return_to_origin", params_.returnToOrigin_)) {

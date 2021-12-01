@@ -29,7 +29,6 @@ nbvp/dt: 0.1
 nbvp/log/throttle: 0.25
 
 nbvp/gain/visualization: true
-nbvp/gain/update_deg_coeff: false
 nbvp/tree/return_to_origin: true
 
 # bounding box: necessary to limit the simulation 

@@ -68,7 +68,6 @@ struct Params
   std::string navigationFrame_;
 
   bool gainVisualization_;
-  bool updateDegressiveCoeff_;
   bool returnToOrigin_;
   double log_throttle_;
   double pcl_throttle_;
@@ -124,7 +123,6 @@ class TreeBase
   int getCounter();
   bool gainFound();
   void insertPointcloudWithTf(const sensor_msgs::PointCloud2::ConstPtr& pointcloud);
-  virtual void updateDegressiveCoeff() = 0;
   virtual int getHistorySize() = 0;
   void updateCoeff();
   double getBestGainValue();
