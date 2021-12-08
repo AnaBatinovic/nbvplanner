@@ -114,7 +114,7 @@ int main(int argc, char** argv)
   
   // Start planning: The planner is called and the computed path sent to the controller.
   int iteration = 0;
-  ros::Rate rate(1);
+  ros::Rate rate(10);
   nbvplanner::volume_srv volumeSrv;
   while (ros::ok()) {
     ros::spinOnce();
@@ -131,6 +131,7 @@ int main(int argc, char** argv)
         n_seq++;
         if (planSrv.response.path.size() == 0) {
           ros::Duration(1.0).sleep();
+          current_goal_reached = true;
         }
         else {
           geometry_msgs::PoseArray goals;

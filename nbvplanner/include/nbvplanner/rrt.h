@@ -44,12 +44,11 @@ class RrtTree : public TreeBase<Eigen::Vector4d>
   virtual void setPeerStateFromPoseMsg(const geometry_msgs::PoseWithCovarianceStamped& pose, int n_peer);
   virtual void initialize();
   virtual void iterate(int iterations);
-  virtual std::vector<geometry_msgs::Pose> getBestEdge(std::string targetFrame);
   virtual std::vector<geometry_msgs::Pose> getBestPathNodes(std::string targetFrame);
   virtual void clear();
   virtual std::vector<geometry_msgs::Pose> getPathBackToPrevious(std::string targetFrame);
   virtual void memorizeBestBranch();
-  int castUnknown(StateVec state, double a, double distance, double row,
+  int castUnknown(StateVec state, double gain_range, double distance, double row,
     double start_slope, double end_slope, double xx, double xy, double yx, double yy);
   void publishNode(Node<StateVec> * node);
   void publishBestNode();
@@ -61,15 +60,11 @@ class RrtTree : public TreeBase<Eigen::Vector4d>
   void visualizeCenter(Eigen::Vector3d vec);
   void visualizeCuboid(StateVec start, StateVec end);
   virtual std::vector<geometry_msgs::Pose> getReturnEdge(std::string targetFrame);
-  virtual void updateDegressiveCoeff();
   bool findShortestPath(StateVec goal);
   bool setGoal();
   virtual int getHistorySize();
-  double gain(StateVec state);
   double gainCube(StateVec start,  double distance, double a);
-  double gainCuboid(StateVec start,  double distance, double a);
-  std::vector<geometry_msgs::Pose> samplePath(StateVec start, StateVec end,
-                                              std::string targetFrame);
+  double gainCuboid(StateVec start,  double distance, double gain_range);
   double samplePathWithCubes(StateVec start, StateVec end,
                                               std::string targetFrame);
  protected:

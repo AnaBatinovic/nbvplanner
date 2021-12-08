@@ -57,7 +57,7 @@ class nbvPlanner
   Params params_;
   volumetric_mapping::OctomapManager * manager_;
 
-  bool returnToOrigin = false;
+  bool resolveDeadEnd = false;
 
   bool ready_;
 

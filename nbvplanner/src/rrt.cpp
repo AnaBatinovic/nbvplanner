@@ -340,26 +340,6 @@ void nbvInspection::RrtTree::initialize()
   params_.inspectionPath_.publish(p);
 }
 
-std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::getBestEdge(std::string targetFrame)
-{
-// This function returns the first edge of the best branch
-  std::vector<geometry_msgs::Pose> ret;
-  nbvInspection::Node<StateVec> * current = bestNode_;
-  ROS_INFO("Best Gain: %4.15f", bestNode_->gain_);
-  publishBestNode();
-  //Resursive method for finding next point for UAV to move towards 
-  if (current->parent_ != NULL) {
-    while (current->parent_ != rootNode_ && current->parent_ != NULL) {
-      current = current->parent_;
-    }
-    publishCurrentNode(current);
-    ret = samplePath(current->parent_->state_, current->state_, targetFrame);
-    history_.push(current->parent_->state_);
-    exact_root_ = current->state_;
-  }
-  return ret;
-}
-
 std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::getBestPathNodes(std::string targetFrame)
 {
 // This function returns the nodes of the best branch
@@ -395,12 +375,10 @@ std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::getBestPathNodes(std::s
     }
     // Reverse vector
     std::reverse(ret.begin(), ret.end());
-    // ret = samplePath(current->parent_->state_, current->state_, targetFrame);  
   }
   return ret;
 }
 
-//Function for returning to origin
 std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::getReturnEdge(std::string targetFrame)
 {
   if(callOnce){
@@ -421,11 +399,17 @@ std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::getReturnEdge(std::stri
     shortest_ = history_.top();
     }
   publishReturnNode(shortest_);
-  ret = samplePath(root_, shortest_, targetFrame);
   history_.pop();
   if(history_.empty()){
     exact_root_ = goal_;
   }
+ 
+  // Collect all nodes from root_ to the best return node  
+  geometry_msgs::Pose pose;
+  pose.position.x = shortest_.x();
+  pose.position.y = shortest_.y();
+  pose.position.z = shortest_.z();
+  ret.push_back(pose);
   return ret;
 }
 
@@ -630,137 +614,7 @@ void nbvInspection::RrtTree::visualizeCuboid(StateVec start, StateVec end)
   params_.inspectionPath_.publish(p);
 }
 
-double nbvInspection::RrtTree::gain(StateVec state)
 {
-// This function computes the gain
-  double gain = 0.0;
-  const double disc = manager_->getResolution();
-  Eigen::Vector3d origin(state[0], state[1], state[2]);
-  Eigen::Vector3d vec;
-  Eigen::Vector3d pom;
-  Eigen::Vector3d pom2;
-  Eigen::Vector4d rootPom;
-  rootPom[0] = root_[0];
-  rootPom[1] = root_[1];
-  rootPom[2] = root_[2] - 0.7; //sensor offset error correction
-  rootPom[3] = root_[3];
-  double rangeSq = pow(params_.gainRange_, 2.0);
-// Iterate over all nodes within the allowed distance
-  for (vec[0] = std::max(state[0] - params_.gainRange_, params_.minX_);
-      vec[0] < std::min(state[0] + params_.gainRange_, params_.maxX_); vec[0] += disc) {
-    for (vec[1] = std::max(state[1] - params_.gainRange_, params_.minY_);
-        vec[1] < std::min(state[1] + params_.gainRange_, params_.maxY_); vec[1] += disc) {
-      for (vec[2] = std::max(state[2] - params_.gainRange_, params_.minZ_);
-          vec[2] < std::min(state[2] + params_.gainRange_, params_.maxZ_); vec[2] += disc) {
-        Eigen::Vector3d dir = vec - origin;
-        // Skip if distance is too large
-        if (dir.transpose().dot(dir) > rangeSq) {
-          continue;
-        }
-        //Calculating angle between two vectors with origin in root_
-        //Shifting both vectors in same origin ( root_ )
-        //MAV is located in root_ when new nodes are being calculated
-        int i;
-        for(i = 0; i < sizeof(vec)/sizeof(vec[0]); i++){
-          pom2[i] = vec[i] - rootPom[i];
-          pom[i] = pom2[i];
-        }
-        pom[2] = rootPom[2];
-
-        double minRange = sqrt(pow(pom2[0],2) + pow(pom2[1],2) + pow(pom2[2],2));
-        if (minRange < 1.0){
-          continue;
-        }
-        //Math equations for angle between two vectors in 3D space
-        //Angle between vector and its orthogonal projection on xy-plane
-        double num = pom2[0]*pom[0] + pom2[1]*pom[1] + pom2[2]*pom[2];
-        double denum = sqrt( pow(pom2[0],2) + pow(pom2[1],2) + pow(pom2[2],2) ) 
-                      * sqrt( pow(pom[0],2) + pow(pom[1],2) + pow(pom[2],2) );
-        double normalAngle = acos(num/denum) * 180 / M_PI;
-        double x2 = pom[0] * cos(-rootPom[3]) - pom[1] * sin(-rootPom[3]);
-        double y2 = pom[0] * sin(-rootPom[3]) + pom[1] * cos(-rootPom[3]);
-
-        //Recommended to set pitch for VLP-16 in model config to see the floor
-        //default pitch is set to 10 deg
-          bool aboveZ;
-          bool pitchForward;
-          //Checking whether RRT is in first or fourth quadrant with root as new local origin
-          //Laser points towards x axis and has a pitch of 10.0 degrees by default
-          if ( ((x2 > rootPom[0]) && (y2 > rootPom[1]) ) || ((x2 > rootPom[0]) && (y2 < rootPom[1])) ) {
-            pitchForward = true;
-          } else { 
-              pitchForward = false;
-            }
-          //Checking if dot is above/below xy-plane
-          if (vec[2] > rootPom[2]){
-            aboveZ = true;
-          } else {
-              aboveZ = false;
-            }
-            //Calculating new angles with pitch included
-            if(pitchForward && aboveZ) {
-              if (normalAngle > (params_.laserVertical_[0]/2 - params_.laserPitch_[0]) ) {
-                continue;
-              }
-            } else if (pitchForward && !aboveZ){
-                if(normalAngle > (params_.laserVertical_[0]/2 + params_.laserPitch_[0]) ) {
-                  continue;
-                }
-            } else if (!pitchForward && aboveZ){
-                if(normalAngle > (params_.laserVertical_[0]/2 + params_.laserPitch_[0]) ) {
-                  continue;
-                }
-            } else if (!pitchForward && !aboveZ) {
-                if(normalAngle > (params_.laserVertical_[0]/2 - params_.laserPitch_[0]) ) {
-                  continue;
-                }
-              }
-
-        // Check cell status and add to the gain considering the corresponding factor.
-        double probability;
-        volumetric_mapping::OctomapManager::CellStatus node = manager_->getCellProbabilityPoint(
-            vec, &probability);
-        if (node == volumetric_mapping::OctomapManager::CellStatus::kUnknown) {
-          // Rayshooting to evaluate inspectability of cell
-          if (volumetric_mapping::OctomapManager::CellStatus::kOccupied
-              != this->manager_->getVisibility(origin, vec, false)) {
-            gain += params_.igUnmapped_;
-            // ETHZCommentTODO: Add probabilistic gain
-            // gain += params_.igProbabilistic_ * PROBABILISTIC_MODEL(probability);
-          }
-        } else if (node == volumetric_mapping::OctomapManager::CellStatus::kOccupied) {
-          // Rayshooting to evaluate inspectability of cell
-          if (volumetric_mapping::OctomapManager::CellStatus::kOccupied
-              != this->manager_->getVisibility(origin, vec, false)) {
-            gain += params_.igOccupied_;
-            // ETHZcomment:TODO: Add probabilistic gain
-            // gain += params_.igProbabilistic_ * PROBABILISTIC_MODEL(probability);
-          }
-        } else {
-          // Rayshooting to evaluate inspectability of cell
-          if (volumetric_mapping::OctomapManager::CellStatus::kOccupied
-              != this->manager_->getVisibility(origin, vec, false)) {
-            gain += params_.igFree_;
-            // ETHZcomment:TODO: Add probabilistic gain
-            // gain += params_.igProbabilistic_ * PROBABILISTIC_MODEL(probability);
-          }
-        }
-        //Gain visualization
-        if(params_.gainVisualization_){
-          if(node == volumetric_mapping::OctomapManager::CellStatus::kUnknown &&
-            volumetric_mapping::OctomapManager::CellStatus::kOccupied
-              != this->manager_->getVisibility(origin, vec, false)){
-            visualizeGainRed(vec);
-          } else {
-            visualizeGain(vec);
-          }
-        }
-      }
-    }
-  }
-// Scale with volume
-  gain *= pow(disc, 3.0);
-  return gain;
 }
 
 double nbvInspection::RrtTree::gainCuboid(StateVec state, double distance, double gain_range)
@@ -1075,49 +929,6 @@ void nbvInspection::RrtTree::publishReturnNode(StateVec node)
   p.lifetime = ros::Duration(50.0);
   p.frame_locked = false;
   params_.inspectionPath_.publish(p);
-}
-
-std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::samplePath(StateVec start, StateVec end,
-                                                                    std::string targetFrame)
-{
-  std::vector<geometry_msgs::Pose> ret;
-  static tf::TransformListener listener;
-  tf::StampedTransform transform;
-  try {
-    listener.lookupTransform(targetFrame, params_.navigationFrame_, ros::Time(0), transform);
-  } catch (tf::TransformException ex) {
-    ROS_ERROR("%s", ex.what());
-    return ret;
-  }
-  Eigen::Vector3d distance(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
-  double yaw_direction = end[3] - start[3];
-  if (yaw_direction > M_PI) {
-    yaw_direction -= 2.0 * M_PI;
-  }
-  if (yaw_direction < -M_PI) {
-    yaw_direction += 2.0 * M_PI;
-  }
-  double disc = std::min(params_.dt_ * params_.v_max_ / distance.norm(),
-                         params_.dt_ * params_.dyaw_max_ / abs(yaw_direction));
-  assert(disc > 0.0);
-  for (double it = 0.0; it <= 1.0; it += disc) {
-    tf::Vector3 origin((1.0 - it) * start[0] + it * end[0], (1.0 - it) * start[1] + it * end[1],
-                       (1.0 - it) * start[2] + it * end[2]);
-    double yaw = start[3] + yaw_direction * it;
-    if (yaw > M_PI)
-      yaw -= 2.0 * M_PI;
-    if (yaw < -M_PI)
-      yaw += 2.0 * M_PI;
-    tf::Quaternion quat;
-    quat.setEuler(0.0, 0.0, yaw);
-    origin = transform * origin;
-    quat = transform * quat;
-    tf::Pose poseTF(quat, origin);
-    geometry_msgs::Pose pose;
-    tf::poseTFToMsg(poseTF, pose);
-    ret.push_back(pose);
-  }
-  return ret;
 }
 
 double nbvInspection::RrtTree::samplePathWithCubes(StateVec start, StateVec end,

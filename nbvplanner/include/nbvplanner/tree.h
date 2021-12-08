@@ -68,7 +68,7 @@ struct Params
   std::string navigationFrame_;
 
   bool gainVisualization_;
-  bool returnToOrigin_;
+  bool resolveDeadEnd_;
   double log_throttle_;
   double pcl_throttle_;
   double inspection_throttle_;
@@ -113,7 +113,6 @@ class TreeBase
   void setPeerStateFromPoseMsg3(const geometry_msgs::PoseWithCovarianceStamped& pose);
   virtual void iterate(int iterations) = 0;
   virtual void initialize() = 0;
-  virtual std::vector<geometry_msgs::Pose> getBestEdge(std::string targetFrame) = 0;
   virtual std::vector<geometry_msgs::Pose> getBestPathNodes(std::string targetFrame) = 0;
   virtual void clear() = 0;
   virtual std::vector<geometry_msgs::Pose> getPathBackToPrevious(std::string targetFrame) = 0;
