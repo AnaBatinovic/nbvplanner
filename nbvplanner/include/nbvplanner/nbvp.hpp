@@ -169,12 +169,11 @@ bool nbvInspection::nbvPlanner<stateVec>::plannerCallback(nbvplanner::nbvp_srv::
   if(resolveDeadEnd && ros::ok()){
     ROS_WARN("Resolving dead end...");
     res.path = tree_->getReturnEdge(req.header.frame_id);
-    if(tree_->getHistorySize() == 0){
-        ROS_INFO("Successfully returned to origin. Finding best gain...");
+    ROS_WARN_STREAM("History dead end size: " << tree_->getHistoryDeadEndSize());
+    if(tree_->getHistoryDeadEndSize() == 0){
+        ROS_INFO("Successfully returned to the best node. Continue exploration...");
         resolveDeadEnd = false;
     }
-    // ROS_INFO("Successfully returned to the best node. Continue exploration...");
-    // resolveDeadEnd = false;
     return true;
   }
 
@@ -192,8 +191,8 @@ bool nbvInspection::nbvPlanner<stateVec>::plannerCallback(nbvplanner::nbvp_srv::
                             (params_.maxY_ - params_.minY_) * 
                             (params_.maxZ_ - params_.minZ_);
       if(params_.resolveDeadEnd_ && 
-        !manager_->checkExploredVolumeShare(totalVolume, 0.70) && 
-        tree_->getBestGainValue() < 0.1){
+        !manager_->checkExploredVolumeShare(totalVolume, 0.98) && 
+        tree_->getBestGainValue() < params_.threshold_gain_){
         ROS_ERROR("Gain is small and more than 30% unexplored - dead end detected");
         res.path = tree_->getReturnEdge((req.header.frame_id));
         resolveDeadEnd = true;
@@ -205,7 +204,7 @@ bool nbvInspection::nbvPlanner<stateVec>::plannerCallback(nbvplanner::nbvp_srv::
           return true;
         }
     }
-    if (loopCount > 10000 * (tree_->getCounter() + 1)) {
+    if (loopCount > 100000 * (tree_->getCounter() + 1)) {
       ROS_INFO_THROTTLE(1, "Exceeding maximum failed iterations, return to previous point!");
       res.path = tree_->getPathBackToPrevious(req.header.frame_id);
       return true;
@@ -218,13 +217,12 @@ bool nbvInspection::nbvPlanner<stateVec>::plannerCallback(nbvplanner::nbvp_srv::
 
   // Resolve dead end
   ros::Time computationStartTime2 = ros::Time::now();
-  if(params_.resolveDeadEnd_ && 
-    tree_->getBestGainValue() < 0.5) {
+  if(params_.resolveDeadEnd_ && tree_->getBestGainValue() < params_.threshold_gain_) {
     double totalVolume = (params_.maxX_ - params_.minX_) * 
                         (params_.maxY_ - params_.minY_) * 
-                        (params_.maxZ_ - params_.minZ_); 
-    if(!manager_->checkExploredVolumeShare(totalVolume, 3)){
-      ROS_ERROR("Gain less than 1e-1 and more than 20 percent unexplored - dead end detected!");
+                        (1+ params_.maxZ_ - params_.minZ_); 
+    if(!manager_->checkExploredVolumeShare(totalVolume, 0.98)){
+      ROS_ERROR("Gain less than threshold, exploration not completed - dead end detected!");
       res.path = tree_->getReturnEdge((req.header.frame_id));
       resolveDeadEnd = true;
       return true;
@@ -467,6 +465,11 @@ bool nbvInspection::nbvPlanner<stateVec>::setParams()
   if (!ros::param::get(ns + "/nbvp/gain/zero", params_.zero_gain_)) {
     ROS_WARN("No zero gain value specified. Looking for %s. Default is 0.0.",
              (ns + "/nbvp/gain/zero").c_str());
+  }
+  params_.threshold_gain_ = 0.1;
+  if (!ros::param::get(ns + "/nbvp/gain/threshold", params_.threshold_gain_)) {
+    ROS_WARN("No threshold gain value specified. Looking for %s. Default is 0.1.",
+             (ns + "/nbvp/gain/threshold").c_str());
   }
   params_.dOvershoot_ = 0.5;
   if (!ros::param::get(ns + "/system/bbx/overshoot", params_.dOvershoot_)) {

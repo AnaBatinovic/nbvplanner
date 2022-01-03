@@ -382,29 +382,32 @@ std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::getBestPathNodes(std::s
 std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::getReturnEdge(std::string targetFrame)
 {
   if(callOnce){
+    // Fill histroyDeadEnd
+    StateVec return_node = getReturnNode();
     callOnce = setGoal();  //false
   }
   bool foundShortest = false;
   std::vector<geometry_msgs::Pose> ret;
-  if (history_.empty()) {
-    ROS_INFO("History empty!");
+  if (historyDeadEnd_.empty()) {
+    ROS_INFO("History dead end empty!");
+    callOnce = false;
     exact_root_ = goal_;
     return ret;
   }
-  foundShortest = findShortestPath(goal_);
+  foundShortest = findShortestPath();
   if(boolFirstSeen_){
     shortest_ = firstSeen_;
   } else {
     ROS_INFO("Shortest not found, returning to previous point!");
-    shortest_ = history_.top();
-    }
-  publishReturnNode(shortest_);
-  history_.pop();
-  if(history_.empty()){
+    shortest_ = historyDeadEnd_.top();
+  }
+  publishReturnNodePom(shortest_);
+  historyDeadEnd_.pop();
+  if(historyDeadEnd_.empty()){
     exact_root_ = goal_;
   }
  
-  // Collect all nodes from root_ to the best return node  
+  // Collect all nodes from root_ to the best node to return to  
   geometry_msgs::Pose pose;
   pose.position.x = shortest_.x();
   pose.position.y = shortest_.y();
@@ -415,51 +418,47 @@ std::vector<geometry_msgs::Pose> nbvInspection::RrtTree::getReturnEdge(std::stri
 
 //Recursive function returns first node from origin that is collision free
 //Nodes from first found to MAV root are removed
-bool nbvInspection::RrtTree::findShortestPath(StateVec goal){
+bool nbvInspection::RrtTree::findShortestPath(){
   //Find shortest path to origin
   bool found;
   boolFirstSeen_ = false;
-  if (history_.empty()) {
+  if (historyDeadEnd_.empty()) {
     return false;
   }
 
-  StateVec newState;
-  StateVec state = history_.top();
-  history_.pop();
+  StateVec state = historyDeadEnd_.top();
+  historyDeadEnd_.pop();
 
-  //Recursion
-  found = findShortestPath(goal_);
+  // Recursion
+  found = findShortestPath();
 
   Eigen::Vector3d origin(root_[0], root_[1], root_[2]);
   Eigen::Vector3d direction(state[0] - origin[0], state[1] - origin[1],
                               state[2] - origin[2]);
-  newState[0] = origin[0] + direction[0];
-  newState[1] = origin[1] + direction[1];
-  newState[2] = origin[2] + direction[2];
-    if (volumetric_mapping::OctomapManager::CellStatus::kFree
-    == manager_->getLineStatusBoundingBox(
-        origin, direction + origin + direction.normalized() * params_.dOvershoot_,
-        params_.boundingBox_)) {
-      if(!boolFirstSeen_){
-        firstSeen_ = state;
-        boolFirstSeen_ = true;
-        found = true;
-        history_.push(state);
-      }
+  if (volumetric_mapping::OctomapManager::CellStatus::kFree
+  == manager_->getLineStatusBoundingBox(
+      origin, direction + origin + direction.normalized() * params_.dOvershoot_,
+      params_.boundingBox_)) {
+    if(!boolFirstSeen_){
+      firstSeen_ = state;
+      boolFirstSeen_ = true;
+      found = true;
+      historyDeadEnd_.push(state);
     }
-    //remove remaining nodes from stack
-    if(!found){
-      history_.push(state);
-    }
+  }
+  // Remove remaining nodes from stack
+  if(!found){
+    historyDeadEnd_.push(state);
+  }
   return found;
 }
 
 bool nbvInspection::RrtTree::setGoal(){
-  if (history_.empty()) {
+  if (historyDeadEnd_.empty()) {
     return true;
   }
-  StateVec state = history_.top();
-  history_.pop();
+  StateVec state = historyDeadEnd_.top();
+  historyDeadEnd_.pop();
   bool foundLast = setGoal();
 
   if(foundLast){
@@ -467,13 +466,59 @@ bool nbvInspection::RrtTree::setGoal(){
     ROS_INFO("Goal: X = %f, Y = %f, Z = %f, Yaw = %f",
               goal_[0], goal_[1], goal_[2], goal_[3]);
   }
-  history_.push(state);
+  historyDeadEnd_.push(state);
   return false;
 }
 
+nbvInspection::RrtTree::StateVec nbvInspection::RrtTree::getReturnNode(){
+  // [1,2,3,4,5,6]
+  std::stack<StateVec> history_local = history_;
+
+  double gain_max = params_.zero_gain_;
+  std::vector<StateVec> history_vector;
+  StateVec state_to_return;
+  if (history_local.empty()) {
+    ROS_WARN("History local is empty.");
+    return state_to_return;
+  }
+  // Find the best node from history using shadowcasting in each node from history
+  int history_size = history_local.size();
+  int index_gain_max = 0;
+  for (int i = 0; i < history_size; i++) {
+    StateVec state = history_local.top();
+    history_local.pop();
+    // [6,5,4,3,2,1]
+    history_vector.push_back(state);
+    double gain = gainCuboid(state, params_.gainRange_, params_.gainRange_);
+    if (gain > gain_max){
+      gain_max = gain;
+      index_gain_max = i;
+      state_to_return = state;
+    }  
+  }
+  bool find_best_node_in_vector = false;
+  //krece od kraja vectora, stog izgleda [1,2,3..], najblizi je na vrhu
+  for (int i = history_size - 1; i >= 0; i--) {
+    if (i == index_gain_max) find_best_node_in_vector = true;
+    if (find_best_node_in_vector) {
+      historyDeadEnd_.push(history_vector[i]);
+    }
+  }
+  goal_ = state_to_return;
+  ROS_INFO("State to return: X = %f, Y = %f, Z = %f",
+          goal_[0], goal_[1], goal_[2]);
+  publishReturnNode(goal_);
+  ROS_INFO_STREAM("Size of historyDeadEnd_: " << historyDeadEnd_.size());
+  ROS_INFO_STREAM("Size of history_vector: " << history_vector.size());
+  return state_to_return;
+}
 
 int nbvInspection::RrtTree::getHistorySize(){
   return history_.size();
+}
+
+int nbvInspection::RrtTree::getHistoryDeadEndSize(){
+  return historyDeadEnd_.size();
 }
 
 void nbvInspection::RrtTree::visualizeGain(Eigen::Vector3d vec)
@@ -612,9 +657,6 @@ void nbvInspection::RrtTree::visualizeCuboid(StateVec start, StateVec end)
   p.lifetime = ros::Duration(5.0);
   p.frame_locked = false;
   params_.inspectionPath_.publish(p);
-}
-
-{
 }
 
 double nbvInspection::RrtTree::gainCuboid(StateVec state, double distance, double gain_range)
@@ -926,7 +968,39 @@ void nbvInspection::RrtTree::publishReturnNode(StateVec node)
   p.color.g = 0.0;
   p.color.b = 0.0;
   p.color.a = 1.0;
-  p.lifetime = ros::Duration(50.0);
+  p.lifetime = ros::Duration(100.0);
+  p.frame_locked = false;
+  params_.inspectionPath_.publish(p);
+}
+
+void nbvInspection::RrtTree::publishReturnNodePom(StateVec node)
+{
+  visualization_msgs::Marker p;
+  p.header.stamp = ros::Time::now();
+  p.header.seq = ret_ID_;
+  p.header.frame_id = params_.navigationFrame_;
+  p.id = ret_ID_;
+  ret_ID_++;
+  p.ns = "vp_tree";
+  p.type = visualization_msgs::Marker::SPHERE;
+  p.action = visualization_msgs::Marker::ADD;
+  p.pose.position.x = node[0];
+  p.pose.position.y = node[1];
+  p.pose.position.z = node[2];
+  tf::Quaternion quat;
+  quat.setEuler(0.0, 0.0, node[3]);
+  p.pose.orientation.x = quat.x();
+  p.pose.orientation.y = quat.y();
+  p.pose.orientation.z = quat.z();
+  p.pose.orientation.w = quat.w();
+  p.scale.x = 0.5;
+  p.scale.y = 0.5;
+  p.scale.z = 0.5;
+  p.color.r = 1.0;
+  p.color.g = 0.5;
+  p.color.b = 0.0;
+  p.color.a = 1.0;
+  p.lifetime = ros::Duration(100.0);
   p.frame_locked = false;
   params_.inspectionPath_.publish(p);
 }
@@ -968,8 +1042,6 @@ double nbvInspection::RrtTree::samplePathWithCubes(StateVec start, StateVec end,
   state[1] = origin[1];
   state[2] = origin[2];
   gain += gainCuboid(state, distance.norm(), params_.gainRange_);
-  // Visualize cuboid on the path segment
-  visualizeCuboid(start, end);
   return gain;
 }
 

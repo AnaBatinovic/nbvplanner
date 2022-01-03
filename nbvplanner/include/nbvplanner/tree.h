@@ -43,6 +43,7 @@ struct Params
   double gainRange_;
   double degressiveCoeff_;
   double zero_gain_;
+  double threshold_gain_;
 
   double v_max_;
   double dyaw_max_;
@@ -123,6 +124,7 @@ class TreeBase
   bool gainFound();
   void insertPointcloudWithTf(const sensor_msgs::PointCloud2::ConstPtr& pointcloud);
   virtual int getHistorySize() = 0;
+  virtual int getHistoryDeadEndSize() = 0;
   void updateCoeff();
   double getBestGainValue();
 };

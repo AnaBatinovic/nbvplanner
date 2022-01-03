@@ -54,15 +54,18 @@ class RrtTree : public TreeBase<Eigen::Vector4d>
   void publishBestNode();
   void publishCurrentNode(Node<StateVec> * node);
   void publishReturnNode(StateVec node);
+  void publishReturnNodePom(StateVec node);
   bool checkIfVisited(StateVec state);
   void visualizeGain(Eigen::Vector3d vec);
   void visualizeGainRed(Eigen::Vector3d vec);
   void visualizeCenter(Eigen::Vector3d vec);
   void visualizeCuboid(StateVec start, StateVec end);
   virtual std::vector<geometry_msgs::Pose> getReturnEdge(std::string targetFrame);
-  bool findShortestPath(StateVec goal);
+  bool findShortestPath();
   bool setGoal();
+  StateVec getReturnNode();
   virtual int getHistorySize();
+  virtual int getHistoryDeadEndSize();
   double gainCube(StateVec start,  double distance, double a);
   double gainCuboid(StateVec start,  double distance, double gain_range);
   double samplePathWithCubes(StateVec start, StateVec end,
@@ -70,6 +73,7 @@ class RrtTree : public TreeBase<Eigen::Vector4d>
  protected:
   kdtree * kdTree_;
   std::stack<StateVec> history_;
+  std::stack<StateVec> historyDeadEnd_;
   std::list<StateVec> branchHistory_;
   std::vector<StateVec> bestBranchMemory_;
   int g_ID_;

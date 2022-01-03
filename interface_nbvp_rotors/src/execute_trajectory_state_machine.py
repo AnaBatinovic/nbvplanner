@@ -141,7 +141,7 @@ class UavExplorationSm:
         
         # Set up flags
         request.publish_path = False
-        request.publish_trajectory = False
+        request.publish_trajectory = True
         request.plan_path = False
         request.plan_trajectory = True
 
