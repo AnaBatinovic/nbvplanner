@@ -25,7 +25,6 @@
 #include <nav_msgs/Odometry.h>
 #include <kdtree/kdtree.h>
 #include <nbvplanner/tree.h>
-#include <nbvplanner/mesh_structure.h>
 
 #define SQ(x) ((x)*(x))
 #define SQRT2 0.70711
@@ -36,33 +35,61 @@ class RrtTree : public TreeBase<Eigen::Vector4d>
 {
  public:
   typedef Eigen::Vector4d StateVec;
-
+  
   RrtTree();
-  RrtTree(mesh::StlMesh * mesh, volumetric_mapping::OctomapManager * manager);
+  RrtTree(volumetric_mapping::OctomapManager * manager);
   ~RrtTree();
   virtual void setStateFromPoseMsg(const geometry_msgs::PoseWithCovarianceStamped& pose);
   virtual void setStateFromOdometryMsg(const nav_msgs::Odometry& pose);
   virtual void setPeerStateFromPoseMsg(const geometry_msgs::PoseWithCovarianceStamped& pose, int n_peer);
   virtual void initialize();
   virtual void iterate(int iterations);
-  virtual std::vector<geometry_msgs::Pose> getBestEdge(std::string targetFrame);
+  virtual std::vector<geometry_msgs::Pose> getBestPathNodes(std::string targetFrame);
   virtual void clear();
   virtual std::vector<geometry_msgs::Pose> getPathBackToPrevious(std::string targetFrame);
   virtual void memorizeBestBranch();
+  int castUnknown(StateVec state, double gain_range, double distance, double row,
+    double start_slope, double end_slope, double xx, double xy, double yx, double yy);
   void publishNode(Node<StateVec> * node);
-  double gain(StateVec state);
-  std::vector<geometry_msgs::Pose> samplePath(StateVec start, StateVec end,
+  void publishBestNode();
+  void publishCurrentNode(Node<StateVec> * node);
+  void publishReturnNode(StateVec node);
+  void publishReturnNodePom(StateVec node);
+  bool checkIfVisited(StateVec state);
+  void visualizeGain(Eigen::Vector3d vec);
+  void visualizeGainRed(Eigen::Vector3d vec);
+  void visualizeCenter(Eigen::Vector3d vec);
+  void visualizeCuboid(StateVec start, StateVec end);
+  virtual std::vector<geometry_msgs::Pose> getReturnEdge(std::string targetFrame);
+  bool findShortestPath();
+  bool setGoal();
+  StateVec getReturnNode();
+  virtual int getHistorySize();
+  virtual int getHistoryDeadEndSize();
+  double gainCube(StateVec start,  double distance, double a);
+  double gainCuboid(StateVec start,  double distance, double gain_range);
+  double samplePathWithCubes(StateVec start, StateVec end,
                                               std::string targetFrame);
  protected:
   kdtree * kdTree_;
   std::stack<StateVec> history_;
+  std::stack<StateVec> historyDeadEnd_;
+  std::list<StateVec> branchHistory_;
   std::vector<StateVec> bestBranchMemory_;
   int g_ID_;
+  int v_ID_= 0;
+  int vr_ID_= 0;
+  int ret_ID_ = 0;
+  StateVec shortest_;
+  StateVec goal_;
+  StateVec firstSeen_;
+  bool boolFirstSeen_;
+  bool callOnce = true;
+  double degressiveCoeff_;
   int iterationCount_;
   std::fstream fileTree_;
   std::fstream filePath_;
   std::fstream fileResponse_;
-  std::string logFilePath_;
   std::vector<double> inspectionThrottleTime_;
 };
 }

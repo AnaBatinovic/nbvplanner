@@ -22,8 +22,6 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <octomap_world/octomap_manager.h>
-#include <multiagent_collision_check/Segment.h>
-#include <nbvplanner/mesh_structure.h>
 
 namespace nbvInspection {
 
@@ -32,6 +30,9 @@ struct Params
   std::vector<double> camPitch_;
   std::vector<double> camHorizontal_;
   std::vector<double> camVertical_;
+  std::vector<double> laserPitch_;
+  std::vector<double> laserHorizontal_;
+  std::vector<double> laserVertical_;
   std::vector<std::vector<Eigen::Vector3d> > camBoundNormals_;
 
   double igProbabilistic_;
@@ -42,6 +43,7 @@ struct Params
   double gainRange_;
   double degressiveCoeff_;
   double zero_gain_;
+  double threshold_gain_;
 
   double v_max_;
   double dyaw_max_;
@@ -66,7 +68,8 @@ struct Params
   ros::Publisher inspectionPath_;
   std::string navigationFrame_;
 
-  bool log_;
+  bool gainVisualization_;
+  bool resolveDeadEnd_;
   double log_throttle_;
   double pcl_throttle_;
   double inspection_throttle_;
@@ -94,7 +97,6 @@ class TreeBase
   double bestGain_;
   Node<stateVec> * bestNode_;
   Node<stateVec> * rootNode_;
-  mesh::StlMesh * mesh_;
   volumetric_mapping::OctomapManager * manager_;
   stateVec root_;
   stateVec exact_root_;
@@ -102,7 +104,7 @@ class TreeBase
   std::vector<std::string> agentNames_;
  public:
   TreeBase();
-  TreeBase(mesh::StlMesh * mesh, volumetric_mapping::OctomapManager * manager);
+  TreeBase(volumetric_mapping::OctomapManager * manager);
   ~TreeBase();
   virtual void setStateFromPoseMsg(const geometry_msgs::PoseWithCovarianceStamped& pose) = 0;
   virtual void setStateFromOdometryMsg(const nav_msgs::Odometry& pose) = 0;
@@ -110,17 +112,21 @@ class TreeBase
   void setPeerStateFromPoseMsg1(const geometry_msgs::PoseWithCovarianceStamped& pose);
   void setPeerStateFromPoseMsg2(const geometry_msgs::PoseWithCovarianceStamped& pose);
   void setPeerStateFromPoseMsg3(const geometry_msgs::PoseWithCovarianceStamped& pose);
-  void evade(const multiagent_collision_check::Segment& segmentMsg);
   virtual void iterate(int iterations) = 0;
   virtual void initialize() = 0;
-  virtual std::vector<geometry_msgs::Pose> getBestEdge(std::string targetFrame) = 0;
+  virtual std::vector<geometry_msgs::Pose> getBestPathNodes(std::string targetFrame) = 0;
   virtual void clear() = 0;
   virtual std::vector<geometry_msgs::Pose> getPathBackToPrevious(std::string targetFrame) = 0;
+  virtual std::vector<geometry_msgs::Pose> getReturnEdge(std::string targetFrame) = 0;
   virtual void memorizeBestBranch() = 0;
   void setParams(Params params);
   int getCounter();
   bool gainFound();
   void insertPointcloudWithTf(const sensor_msgs::PointCloud2::ConstPtr& pointcloud);
+  virtual int getHistorySize() = 0;
+  virtual int getHistoryDeadEndSize() = 0;
+  void updateCoeff();
+  double getBestGainValue();
 };
 }
 
