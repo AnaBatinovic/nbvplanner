@@ -12,7 +12,8 @@ windows:
   - gazebo:
       layout: tiled
       panes:
-        - waitForRos; roslaunch ardupilot_gazebo kopterworx.launch use_sim_time:=true enable_velodyne:=true max_range:=20 world:=$(rospack find interface_nbvp_rotors)/worlds/large_maze.world x:=14 y:=14
+        - waitForRos; roslaunch ardupilot_gazebo kopterworx.launch use_sim_time:=true enable_velodyne:=true max_range:=20
+        - waitForRos; waitForSimulation; roslaunch larics_gazebo_worlds spawn_arena_v1.launch
   - arm&takeof:
       layout: tiled
       panes:
