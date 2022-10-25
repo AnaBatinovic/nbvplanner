@@ -680,6 +680,7 @@ double nbvInspection::RrtTree::gainCuboid(StateVec state, double distance, doubl
   }
 
   // return unknown volume
+  // ROS_WARN_STREAM("Unknown number: " << unknownNum);
   return unknownNum * pow(resolution, 3.0); 
 }
 
@@ -720,7 +721,31 @@ int nbvInspection::RrtTree::castUnknown(StateVec state, double gain_range, doubl
             z >= params_.maxZ_ || z < params_.minZ_) {
             continue;
           }
-          
+
+          // Check if the calculated point is inside FOV
+          Eigen::Vector3d dir (X - state[0], Y - state[1], z - state[2]); 
+          bool insideFOV = false;
+          for (typename std::vector<std::vector<Eigen::Vector3d>>::iterator 
+            itCBN = params_.camBoundNormals_.begin(); itCBN != params_.camBoundNormals_.end(); itCBN++) {
+            bool inThisFOV = true;
+            for (typename std::vector<Eigen::Vector3d>::iterator 
+              itSingleCBN = itCBN->begin(); itSingleCBN != itCBN->end(); itSingleCBN++) {
+              Eigen::Vector3d normal = Eigen::AngleAxisd(state[3], Eigen::Vector3d::UnitZ())
+                * (*itSingleCBN);
+              double val = dir.dot(normal.normalized());
+              // ROS_WARN_STREAM("val: " << val);
+              if (val < SQRT2 * resolution) {
+                inThisFOV = false;
+                break;
+              }
+            }
+            if (inThisFOV) {
+              insideFOV = true;
+              break;
+            }
+          }
+          if (!insideFOV) continue;
+
           // Get cell probability (status)
           Eigen::Vector3d vec(X, Y, z);
           double probability;

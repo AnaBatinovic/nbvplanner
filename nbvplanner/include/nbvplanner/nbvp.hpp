@@ -73,6 +73,33 @@ nbvInspection::nbvPlanner<stateVec>::nbvPlanner(const ros::NodeHandle& nh,
     ROS_ERROR("Could not start the planner. Parameters missing!");
   }
 
+  // Precompute the camera field of view boundaries. The normals of the separating hyperplanes are stored
+  for (int i = 0; i < params_.camPitch_.size(); i++) {
+    double pitch = M_PI * params_.camPitch_[i] / 180.0;
+    double camTop = (pitch - M_PI * params_.camVertical_[i] / 360.0) + M_PI / 2.0;
+    double camBottom = (pitch + M_PI * params_.camVertical_[i] / 360.0) - M_PI / 2.0;
+    double side = M_PI * (params_.camHorizontal_[i]) / 360.0 - M_PI / 2.0;
+    Vector3d bottom(cos(camBottom), 0.0, -sin(camBottom));
+    Vector3d top(cos(camTop), 0.0, -sin(camTop));
+    Vector3d right(cos(side), sin(side), 0.0);
+    Vector3d left(cos(side), -sin(side), 0.0);
+    AngleAxisd m = AngleAxisd(pitch, Vector3d::UnitY());
+    Vector3d rightR = m * right;
+    Vector3d leftR = m * left;
+    rightR.normalize();
+    leftR.normalize();
+    std::vector<Eigen::Vector3d> camBoundNormals;
+    camBoundNormals.push_back(bottom);
+    // ROS_INFO("bottom: (%2.2f, %2.2f, %2.2f)", bottom[0], bottom[1], bottom[2]);
+    camBoundNormals.push_back(top);
+    // ROS_INFO("top: (%2.2f, %2.2f, %2.2f)", top[0], top[1], top[2]);
+    camBoundNormals.push_back(rightR);
+    // ROS_INFO("rightR: (%2.2f, %2.2f, %2.2f)", rightR[0], rightR[1], rightR[2]);
+    camBoundNormals.push_back(leftR);
+    // ROS_INFO("leftR: (%2.2f, %2.2f, %2.2f)", leftR[0], leftR[1], leftR[2]);
+    params_.camBoundNormals_.push_back(camBoundNormals);
+  }
+  
   // Initialize the tree instance.
   tree_ = new RrtTree(manager_);
   tree_->setParams(params_);
